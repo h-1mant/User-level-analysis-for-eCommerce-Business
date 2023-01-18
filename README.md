@@ -6,10 +6,6 @@
 - Data Analysis
 - AB Testing
 
-Report Link
----
-[Report](https://app.mode.com/hemant123/reports/bffee12b0b9c)
-
 Description
 ---
 AB Testing is an application of Hypothesis Testing aimed at improving business metrics like revenue, including other explanatory metrics. It is an important final step in the algorithm development process, where verification is performed on whether a new iteration is an improvement on the existing version. 
