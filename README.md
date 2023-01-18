@@ -46,4 +46,10 @@ Tables used
 
 Summary
 ---
-Tables extracted are pivoted to obtain relevant columns and checks for missing data are performed. A usable table is designed for AB testing to determine if each test yielded statistically significant improvement in the number of orders and webpage views after assignment.
+Tables extracted are pivoted to obtain relevant columns and checks for missing data are performed. A usable table is designed for AB testing to determine if each test yielded statistically significant improvement in the number of orders and webpage views after assignment.  
+
+The results are
+- a **2.77%** improvement in **ORDERS** for treatment group from baseline (control group) with a 93.3% confidence level for test_id 5
+- a **1.40%** improvement in **WEBPAGE VIEWS** for treatment group from baseline (control group) with over 95% significance for test_id 5
+
+
