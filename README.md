@@ -10,7 +10,7 @@ Description
 ---
 AB Testing is an application of Hypothesis Testing aimed at improving business metrics like revenue, including other explanatory metrics. It is an important final step in the algorithm development process, where verification is performed on whether a new iteration is an improvement on the existing version. 
 
-The project is an excerpt from Coursera's ***Data Wrangling, Analysis and AB Testing*** applied for user-level analysis. The [Mode Analytics](https://mode.com/) platform is used to extract data from their public warehouse and perform analysis. The database corresponds to a hypothetical eCommerce platform, wherein an AB test is performed on two groups: 
+The project is an excerpt from Coursera's ***Data Wrangling, Analysis and AB Testing*** applied for user-level analysis. The [Mode Analytics](https://mode.com/) platform was used to extract data from their public warehouse and perform analysis. The database corresponds to a hypothetical eCommerce platform, wherein an AB test is performed on two groups: 
 
 - **Eligibility**
     - users who created an account with a valid email address
