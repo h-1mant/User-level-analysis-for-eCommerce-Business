@@ -1,0 +1,279 @@
+--GOAL: find which parameter to extract for AB Test
+SELECT
+  DISTINCT parameter_name
+FROM
+  dsv1069.events
+ 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+----GOAL: find which event to extract for AB Test
+SELECT
+  DISTINCT event_name
+FROM
+  dsv1069.events
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: find which parameter to extract for AB Test
+SELECT
+  DISTINCT parameter_name
+FROM
+  dsv1069.events
+  
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--GOAL: Pivot events table to obtain relevant columns
+-- 1 implies TREATMENT, 0 implies CONTROL
+
+SELECT
+  user_id,
+  event_id,
+  event_time,
+  platform,
+  MAX(CASE WHEN parameter_name =  'test_id' THEN CAST(parameter_value as INT) ELSE NULL END) 
+      AS test_id,
+  MAX(CASE WHEN parameter_name = 'test_assignment' THEN cast(parameter_value as int) ELSE NULL END)
+      AS test_assignment
+FROM
+  dsv1069.events
+WHERE
+  event_name = 'test_assignment'
+GROUP BY 
+  user_id,
+  event_id,
+  event_time,
+  platform
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+--GOAL: Identify number of running tests
+
+SELECT
+  DISTINCT parameter_value as test_id
+from 
+  dsv1069.events
+where 
+  event_name = 'test_assignment'
+and 
+  parameter_name = 'test_id'
+ 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: Obtain event_counts for each test_id grouped by test_id and event_time (diversion points)
+--Identify if events are uniformly distributed over the time they were recorded
+
+SELECT
+  parameter_value as test_id,
+  date(event_time) as event_time,
+  COUNT(DISTINCT event_id) AS event_count
+FROM
+  dsv1069.events
+WHERE
+  event_name = 'test_assignment'
+AND
+  parameter_name = 'test_id'
+GROUP BY
+  parameter_value,
+  date(event_time)
+
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: Ensure that for each test, every user is given only ONE UNIQUE test assignment
+
+SELECT
+  user_id,
+  test_id,
+  count(distinct test_assignment) as assignment_count
+from
+  (SELECT
+    user_id,
+    event_id,
+    event_time,
+    platform,
+    MAX(CASE WHEN parameter_name =  'test_id' THEN CAST(parameter_value as INT) ELSE NULL END) 
+        AS test_id,
+    MAX(CASE WHEN parameter_name = 'test_assignment' THEN cast(parameter_value as int) ELSE NULL END)
+        AS test_assignment
+  FROM
+    dsv1069.events
+  WHERE
+    event_name = 'test_assignment'
+  GROUP BY 
+    user_id,
+    event_id,
+    event_time,
+    platform) as test_events
+group BY
+  user_id,
+  test_id
+order BY
+  assignment_count DESC
+ 
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+ SELECT
+*
+FROM 
+  dsv1069.orders
+  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: MEASURE IF A USER CREATED AN ORDER AFTER THEIR TEST ASSIGNMENT (called order_binary) 
+-- Even if a user had zero orders, count the number of their orders as zero
+-- If the user is not in the experiment, don't include them
+
+select
+  test_events.user_id,
+  test_events.test_id,
+  test_events.test_assignment,
+  max(case when orders.created_at > test_events.event_time then 1 else 0 end)
+      as orders_after_assignment_binary,
+  count(distinct 
+            case when orders.created_at > test_events.event_time then invoice_id else NULL END)
+      as order_count_after_assignment,
+  count(distinct 
+            case when orders.created_at > test_events.event_time then item_id else NULL END)
+      as item_count_after_assignment,  
+  sum(case when orders.created_at > test_events.event_time then price else 0 END)
+      as total_revenue_after_assignment
+from
+  (SELECT
+    user_id,
+    event_id,
+    event_time,
+    platform,
+    MAX(CASE WHEN parameter_name =  'test_id' THEN CAST(parameter_value as INT) ELSE NULL END) 
+        AS test_id,
+    MAX(CASE WHEN parameter_name = 'test_assignment' THEN cast(parameter_value as int) ELSE NULL END)
+        AS test_assignment
+  FROM
+    dsv1069.events
+  WHERE
+    event_name = 'test_assignment'
+  GROUP BY 
+    user_id,
+    event_id,
+    event_time,
+    platform)
+      as test_events
+left join 
+  dsv1069.orders
+on 
+  test_events.user_id = orders.user_id
+group by 
+  test_events.user_id,
+  test_events.test_id,
+  test_events.test_assignment
+  
+  
+ --------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: Generate a table usable for AB Testing, determine if the treatment under each test yielded statistically significant improvement
+--in number of orders after assignment
+
+SELECT
+  test_id,
+  test_assignment,
+  count(distinct user_id) as user_count,
+  SUM(orders_after_assignment_binary) as order_binary
+from
+  (select
+    test_events.user_id,
+    test_events.test_id,
+    test_events.test_assignment,
+    max(case when orders.created_at > test_events.event_time then 1 else 0 end)
+        as orders_after_assignment_binary
+  from
+    (SELECT
+      user_id,
+      event_id,
+      event_time,
+      platform,
+      MAX(CASE WHEN parameter_name =  'test_id' THEN CAST(parameter_value as INT) ELSE NULL END) 
+          AS test_id,
+      MAX(CASE WHEN parameter_name = 'test_assignment' THEN cast(parameter_value as int) ELSE NULL END)
+          AS test_assignment
+    FROM
+      dsv1069.events
+    WHERE
+      event_name = 'test_assignment'
+    GROUP BY 
+      user_id,
+      event_id,
+      event_time,
+      platform)
+        as test_events
+  left join 
+    dsv1069.orders
+  on 
+    test_events.user_id = orders.user_id
+  group by 
+    test_events.user_id,
+    test_events.test_id,
+    test_events.test_assignment) as order_binary
+group by 
+  order_binary.test_id,
+  order_binary.test_assignment
+  
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+--GOAL: Generate a table usable for AB Testing, determine if the treatment under each test yielded statistically significant improvement in number of views after assignment
+-- Time-capped metric may be used to identify for IMMEDIATE improvemnt in  number of views (within 30 days) 
+SELECT
+  test_id,
+  test_assignment,
+  count(distinct user_id) as user_count,
+  sum(views_binary) as view_count,
+  sum(views_within_30d_binary) as views_within_30d_count
+from
+  (select
+    test_events.user_id,
+    test_events.test_id,
+    test_events.test_assignment,
+    max(case when views.event_time > test_events.event_time then 1 else 0 end)
+        as views_binary,
+    max(case when (views.event_time > test_events.event_time 
+             AND  (DATE_PART('day',views.event_time - test_events.event_time) <= 30))
+             then 1 else 0 end)
+        as views_within_30d_binary 
+  from
+    (SELECT
+      user_id,
+      event_id,
+      event_time,
+      platform,
+      MAX(CASE WHEN parameter_name =  'test_id' THEN CAST(parameter_value as INT) ELSE NULL END) 
+          AS test_id,
+      MAX(CASE WHEN parameter_name = 'test_assignment' THEN cast(parameter_value as int) ELSE NULL END)
+          AS test_assignment
+    FROM
+      dsv1069.events
+    WHERE
+      event_name = 'test_assignment'
+    GROUP BY 
+      user_id,
+      event_id,
+      event_time,
+      platform)
+        as test_events
+  left join 
+    (select
+     *
+     from
+        dsv1069.events
+     where 
+        event_name = 'view_item')
+          as views
+  on 
+    test_events.user_id = views.user_id
+  group by 
+    test_events.user_id,
+    test_events.test_id,
+    test_events.test_assignment) as order_binary
+group by 
+  order_binary.test_id,
+  order_binary.test_assignment
+  
+
+  
